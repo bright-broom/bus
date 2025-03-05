@@ -1,8 +1,10 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// バス時刻表アプリケーション データベーススキーマ
+// PostgreSQLを使用し、Supabaseでホスティング
+// 全てのモデルにタイムスタンプを付与し、変更履歴を追跡
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "postgresqlExtensions"]
 }
 
 datasource db {
@@ -10,11 +12,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// バス路線モデル
+// バス路線の基本情報を管理
 model Route {
-  id        String   @id
-  name      String
-  color     String
+  // 基本情報
+  id        String @id @db.VarChar(10)
+  name      String @db.VarChar(100)
+  color     String @db.VarChar(7)
+  
+  // 運行管理
+  displayOrder Int     @default(0) @map("display_order")
+  isActive    Boolean @default(true) @map("is_active")
+  
+  // タイムスタンプ
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -22,13 +31,22 @@ model Route {
   routeStops RouteStop[]
   departures Departure[]
 
+  // インデックスと設定
+  @@index([displayOrder])
+  @@index([isActive])
   @@map("routes")
 }
 
-// バス停モデル
+// バス停留所の基本情報を管理
 model Stop {
-  id        String   @id
-  name      String
+  // 基本情報
+  id          String   @id @db.VarChar(10)
+  name        String   @db.VarChar(100)
+  latitude    Decimal? @db.Decimal(8, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  description String?  @db.Text
+
+  // タイムスタンプ
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -36,38 +54,56 @@ model Stop {
   routeStops RouteStop[]
   departures Departure[]
 
+  // インデックスと設定
+  @@index([name])
+  @@index([latitude, longitude])
   @@map("stops")
 }
 
-// 路線とバス停の中間テーブル
+// 路線とバス停の関連付けと順序を管理
 model RouteStop {
-  routeId   String @map("route_id")
-  stopId    String @map("stop_id")
-  stopOrder Int    @map("stop_order")
+  // 関連キー
+  routeId String @map("route_id") @db.VarChar(10)
+  stopId  String @map("stop_id") @db.VarChar(10)
+
+  // 運行情報
+  stopOrder Int  @map("stop_order")
+  duration Int? @map("duration_minutes")
 
   // リレーション
-  route Route @relation(fields: [routeId], references: [id])
-  stop  Stop  @relation(fields: [stopId], references: [id])
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop  Stop  @relation(fields: [stopId], references: [id], onDelete: Cascade)
 
+  // インデックスと設定
   @@id([routeId, stopId])
+  @@index([stopOrder])
   @@map("route_stops")
 }
 
-// 時刻表モデル
+// バスの発車時刻情報を管理
 model Departure {
+  // 基本情報
   id           Int      @id @default(autoincrement())
-  routeId      String   @map("route_id")
-  stopId       String   @map("stop_id")
-  departureTime String   @map("departure_time")
+  routeId      String   @map("route_id") @db.VarChar(10)
+  stopId       String   @map("stop_id") @db.VarChar(10)
+  departureTime String   @map("departure_time") @db.VarChar(5)
   daysOfWeek   String[] @map("days_of_week")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // 期間限定運行情報
+  seasonStart DateTime? @map("season_start")
+  seasonEnd   DateTime? @map("season_end")
+
+  // タイムスタンプ
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // リレーション
-  route Route @relation(fields: [routeId], references: [id])
-  stop  Stop  @relation(fields: [stopId], references: [id])
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop  Stop  @relation(fields: [stopId], references: [id], onDelete: Cascade)
 
+  // インデックスと設定
   @@index([routeId, stopId])
   @@index([departureTime])
+  @@index([seasonStart, seasonEnd])
   @@map("departures")
 }
