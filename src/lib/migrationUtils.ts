@@ -9,7 +9,7 @@ export async function migrateDataToDatabase(file: File): Promise<void> {
     const routes = await parseCSVData(file);
     
     // トランザクションでデータを一括登録
-    await prisma.$transaction(async (tx: PrismaClient) => {
+    await prisma.$transaction(async (tx) => {
       for (const route of routes) {
         // ルートの作成
         await tx.route.create({
