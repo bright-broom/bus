@@ -1,33 +1,71 @@
-import { Clock } from '@/components/Clock';
 import { BusRouteList } from '@/components/BusRouteList';
-import { useMemo } from 'react';
-import { Card } from '@/components/ui/card'; // shadcn/ui の Card コンポーネントを利用
+import { prisma } from '@/lib/prisma';
+import { Clock } from '@/components/Clock';
+import type { BusRoute, DayOfWeek } from '@/lib/types';
+import { ALL_DAYS } from '@/lib/types';
 
-// =============================
-// 定数: フッターの文言（変更しやすくするため）
-// =============================
-const FOOTER_TEXT = 'バススケジュールアプリ - すべての路線情報は例示目的のみです';
+// 文字列が有効な曜日かどうかをチェック
+function isDayOfWeek(day: string): day is DayOfWeek {
+  return ALL_DAYS.includes(day as DayOfWeek);
+}
 
-export default function Home() {
-  // =============================
-  // フッター用: 年の取得を最適化（useMemo 使用）
-  // =============================
-  const currentYear = useMemo(() => new Date().getFullYear(), []);
+// 曜日の配列を安全に変換
+function validateDaysOfWeek(days: string[]): DayOfWeek[] {
+  return days.filter(isDayOfWeek);
+}
+
+export default async function Home() {
+  // データベースからルート情報を取得
+  const routes = await prisma.route.findMany({
+    include: {
+      routeStops: {
+        include: {
+          stop: {
+            include: {
+              departures: true,
+            },
+          },
+        },
+        orderBy: {
+          stopOrder: 'asc',
+        },
+      },
+    },
+  });
+
+  // データを整形
+  const formattedRoutes: BusRoute[] = routes.map(route => ({
+    id: route.id,
+    name: route.name,
+    color: route.color as `#${string}`,
+    stops: route.routeStops.map(rs => ({
+      id: rs.stop.id,
+      name: rs.stop.name,
+      departures: rs.stop.departures
+        .filter(d => d.routeId === route.id)
+        .map(d => ({
+          time: d.departureTime as `${number}:${number}`,
+          dayOfWeek: validateDaysOfWeek(d.daysOfWeek),
+        })),
+    })),
+  }));
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
-      {/* 現在時刻を表示するコンポーネント */}
-      <Clock />
+    <main className="container mx-auto p-4 min-h-screen">
+      <div className="flex flex-col gap-6">
+        {/* ヘッダー */}
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
+            バス時刻表アプリ
+          </h1>
+          <Clock />
+        </div>
 
-      {/* メインコンテンツ: バス路線リスト */}
-      <main className="container mx-auto flex-grow py-8 px-4 animate-fade-in">
-        <BusRouteList />
-      </main>
-
-      {/* 固定フッター (shadcn/ui の Card を利用) */}
-      <Card className="w-full text-center text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800">
-        <p className="p-3">© {currentYear} {FOOTER_TEXT}</p>
-      </Card>
-    </div>
+        {/* メインコンテンツ */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+          <BusRouteList initialRoutes={formattedRoutes} />
+        </div>
+      </div>
+    </main>
   );
 }

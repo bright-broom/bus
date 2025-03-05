@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { BusRouteCard } from '@/components/BusRouteCard';
-import { SAMPLE_ROUTES as defaultBusRoutes } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ImportDataDialog } from '@/components/ImportDataDialog';
@@ -10,11 +9,15 @@ import { StopSelector } from '@/components/stop-selector';
 import { RouteIndicator } from '@/components/ui/common';
 import type { BusRoute } from '@/lib/types';
 
-export function BusRouteList() {
+interface BusRouteListProps {
+  initialRoutes: BusRoute[];
+}
+
+export function BusRouteList({ initialRoutes }: BusRouteListProps) {
   // =============================
   // ステート管理
   // =============================
-  const [busRoutes, setBusRoutes] = useState<BusRoute[]>(defaultBusRoutes);
+  const [busRoutes, setBusRoutes] = useState<BusRoute[]>(initialRoutes);
   const [selectedRoutes, setSelectedRoutes] = useState<string[]>([]);
   const [selectedStops, setSelectedStops] = useState<string[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
