@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// バス路線モデル
+model Route {
+  id        String   @id
+  name      String
+  color     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  routeStops RouteStop[]
+  departures Departure[]
+
+  @@map("routes")
+}
+
+// バス停モデル
+model Stop {
+  id        String   @id
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  routeStops RouteStop[]
+  departures Departure[]
+
+  @@map("stops")
+}
+
+// 路線とバス停の中間テーブル
+model RouteStop {
+  routeId   String @map("route_id")
+  stopId    String @map("stop_id")
+  stopOrder Int    @map("stop_order")
+
+  // リレーション
+  route Route @relation(fields: [routeId], references: [id])
+  stop  Stop  @relation(fields: [stopId], references: [id])
+
+  @@id([routeId, stopId])
+  @@map("route_stops")
+}
+
+// 時刻表モデル
+model Departure {
+  id           Int      @id @default(autoincrement())
+  routeId      String   @map("route_id")
+  stopId       String   @map("stop_id")
+  departureTime String   @map("departure_time")
+  daysOfWeek   String[] @map("days_of_week")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  route Route @relation(fields: [routeId], references: [id])
+  stop  Stop  @relation(fields: [stopId], references: [id])
+
+  @@index([routeId, stopId])
+  @@index([departureTime])
+  @@map("departures")
+}
